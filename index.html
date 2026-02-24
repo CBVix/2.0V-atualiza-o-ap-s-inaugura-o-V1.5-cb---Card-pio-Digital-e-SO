@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Churras Brutus - Dashboard</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Biblioteca para geração de PDF via CDN para evitar erros de sandbox -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+    <script>
+        tailwind.config = {
+          theme: {
+            extend: {
+              colors: {
+                primary: '#f97316',
+                'deep-dark': '#09090B',
+                'card-dark': '#1a1a1a',
+                'border-dark': '#27272A',
+                'text-muted': '#A1A1AA'
+              },
+              fontFamily: {
+                sans: ['Inter', 'sans-serif'],
+                display: ['Montserrat', 'sans-serif'],
+              }
+            }
+          }
+        }
+    </script>
+    <style>
+        :root {
+            --primary-color: #f97316;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: transparent;
+            color: #0F172A;
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        canvas {
+            filter: drop-shadow(0 0 10px rgba(249, 115, 22, 0.1));
+        }
+
+        .gradient-card {
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.5);
+        }
+
+        .noise-bg::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          opacity: 0.02;
+          pointer-events: none;
+          background-image: url("https://www.transparenttextures.com/patterns/p6.png");
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.564.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.95.3",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4"
+  }
+}
+</script>
+</head>
+<body class="overflow-hidden noise-bg">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+</body>
+</html>
