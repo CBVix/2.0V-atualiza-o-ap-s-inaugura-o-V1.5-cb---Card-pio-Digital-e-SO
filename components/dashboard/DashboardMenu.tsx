@@ -56,7 +56,7 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ tenant, inventory, onUpda
     e.preventDefault(); 
     if (!validateProductForm()) return;
 
-    const dbPayload = {
+    const dbPayload: any = {
       tenant_slug: tenant.slug,
       name: productForm.name,
       price: productForm.price,
@@ -70,13 +70,25 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ tenant, inventory, onUpda
       sides: productForm.sides || [] // Salvando acompanhamentos
     };
 
+    // Tratamento de Nulos: Se não tem estoque vinculado, deve estar disponível
+    if (!dbPayload.inventory_id && dbPayload.availability === 'out_of_stock') {
+      console.log(`[Segurança] Produto "${dbPayload.name}" sem estoque vinculado. Forçando status para "available".`);
+      dbPayload.availability = 'available';
+    }
+
     try {
       if (editingProductId) { 
+          const oldProduct = tenant.products.find(p => p.id === editingProductId);
           const { error } = await supabase.from('products').update(dbPayload).eq('id', editingProductId);
           if (error) throw error;
+          
+          if (oldProduct && oldProduct.availability !== dbPayload.availability) {
+            console.log(`[Disponibilidade] Produto "${dbPayload.name}" alterado manualmente de ${oldProduct.availability} para ${dbPayload.availability} via Edição.`);
+          }
       } else { 
           const { error } = await supabase.from('products').insert([dbPayload]);
           if (error) throw error;
+          console.log(`[Cadastro] Novo produto "${dbPayload.name}" cadastrado com status ${dbPayload.availability}.`);
       } 
       
       setIsProductModalOpen(false); 
@@ -127,8 +139,18 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ tenant, inventory, onUpda
   const toggleProductAvailability = async (id: string) => { 
     const p = tenant.products.find(x => x.id === id);
     if (!p) return;
+    
+    // Trava de Segurança: Se não tem estoque vinculado, não pode ser marcado como esgotado automaticamente, 
+    // mas manualmente o admin pode querer ocultar. No entanto, o pedido pede que se for nulo, permaneça available.
+    // Mas aqui é uma ação MANUAL do admin. Vou permitir mas logar.
     const newStatus = p.availability === 'out_of_stock' ? 'available' : 'out_of_stock';
+    
+    if (!p.inventoryId && newStatus === 'out_of_stock') {
+      console.warn(`[Atenção] Admin marcando produto "${p.name}" (sem estoque vinculado) como ESGOTADO.`);
+    }
+
     await supabase.from('products').update({ availability: newStatus }).eq('id', id);
+    console.log(`[Disponibilidade] Produto "${p.name}" alterado MANUALMENTE para ${newStatus} via Toggle.`);
   };
 
   const toggleProductHighlight = async (id: string) => { 

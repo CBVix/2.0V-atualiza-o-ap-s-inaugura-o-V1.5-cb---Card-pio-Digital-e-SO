@@ -33,6 +33,7 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
   const [csTableNumber, setCsTableNumber] = useState('');
   const [csCustomerName, setCsCustomerName] = useState('');
   const [csSelectedItems, setCsSelectedItems] = useState<CartItem[]>([]);
+  const [csSelectedCategory, setCsSelectedCategory] = useState<string | null>(null);
   const [isSavingCounterSale, setIsSavingCounterSale] = useState(false);
   const [selectingDonenessFor, setSelectingDonenessFor] = useState<Product | null>(null);
   const [activeMobileTab, setActiveMobileTab] = useState('pending');
@@ -86,8 +87,10 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
   }, [orders]);
 
   useEffect(() => {
-    audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    audioRef.current.load();
+    const audio = new Audio(`/sounds/notification.mp3?v=${Date.now()}`);
+    audio.crossOrigin = 'anonymous';
+    audio.preload = 'none';
+    audioRef.current = audio;
     localStorage.setItem('soundEnabled', String(isAudioEnabled));
   }, [isAudioEnabled]);
 
@@ -124,6 +127,7 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
         });
 
         if (isAudioEnabled && audioRef.current) {
+          audioRef.current.src = `/sounds/notification.mp3?v=${Date.now()}`;
           audioRef.current.play().catch(e => console.warn("Erro ao tocar áudio:", e));
         }
 
@@ -271,12 +275,31 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
 
       // Baixa no estoque
       for (const item of csSelectedItems) {
-        const { data: product } = await supabase.from('products').select('stock, availability').eq('id', item.id).single();
+        const { data: product } = await supabase.from('products').select('stock, availability, inventory_id').eq('id', item.id).single();
         if (product) {
           const currentStock = product.stock || 0;
           const newStock = Math.max(0, currentStock - item.quantity);
-          const newAvailability = newStock === 0 ? 'out_of_stock' : product.availability;
-          await supabase.from('products').update({ stock: newStock, availability: newAvailability }).eq('id', item.id);
+          
+          // Lógica de Disponibilidade Corrigida
+          let newAvailability = product.availability;
+          
+          // Só muda para esgotado se tiver estoque vinculado e chegar a zero
+          if (product.inventory_id && newStock <= 0) {
+            newAvailability = 'out_of_stock';
+            console.log(`[Estoque] Produto "${item.name}" (ID: ${item.id}) marcado como ESGOTADO via Lançar Venda Balcão.`);
+          } else if (!product.inventory_id) {
+            // Se não tem estoque vinculado, garante que continue disponível
+            newAvailability = 'available';
+          }
+
+          await supabase.from('products').update({ 
+            stock: newStock, 
+            availability: newAvailability 
+          }).eq('id', item.id);
+          
+          if (newAvailability !== product.availability) {
+            console.log(`[Disponibilidade] Status de "${item.name}" alterado de ${product.availability} para ${newAvailability}`);
+          }
         }
       }
 
@@ -654,31 +677,32 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
        {/* Modal Lançar Venda (Balcão) */}
        {showCounterSaleModal && (
          <div className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-           <div className="bg-[#161618] border border-white/10 rounded-[32px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] relative">
+           <div className="bg-[#161618] border border-white/10 rounded-[32px] w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] relative">
              <div className="p-6 border-b border-white/5 flex justify-between items-center">
                <h2 className="text-xl font-black text-white uppercase tracking-widest">Lançar Venda (Balcão)</h2>
                <button onClick={() => setShowCounterSaleModal(false)} className="p-2 bg-white/5 hover:bg-white/10 text-gray-400 rounded-full"><X size={20} /></button>
              </div>
 
-             <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-8 hide-scrollbar">
-               <div className="space-y-6">
+             <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+               {/* Coluna Esquerda: Dados e Resumo */}
+               <div className="w-full md:w-[350px] p-6 border-r border-white/5 overflow-y-auto hide-scrollbar flex flex-col gap-6 bg-[#09090B]">
                  <div className="space-y-4">
                    <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Dados do Cliente</h3>
                    <div className="grid grid-cols-2 gap-3">
                      <div className="space-y-1.5">
                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Mesa</label>
-                       <input type="text" value={csTableNumber} onChange={e => setCsTableNumber(e.target.value)} placeholder="Ex: 05" className="w-full bg-[#09090B] border border-white/5 rounded-xl px-4 py-3 text-white text-sm focus:border-primary/50 outline-none" />
+                       <input type="text" value={csTableNumber} onChange={e => setCsTableNumber(e.target.value)} placeholder="Ex: 05" className="w-full bg-[#161618] border border-white/5 rounded-xl px-4 py-3 text-white text-sm focus:border-primary/50 outline-none" />
                      </div>
                      <div className="space-y-1.5">
                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome do Cliente</label>
-                       <input type="text" value={csCustomerName} onChange={e => setCsCustomerName(e.target.value)} placeholder="Ex: João Silva" className="w-full bg-[#09090B] border border-white/5 rounded-xl px-4 py-3 text-white text-sm focus:border-primary/50 outline-none" />
+                       <input type="text" value={csCustomerName} onChange={e => setCsCustomerName(e.target.value)} placeholder="Ex: João Silva" className="w-full bg-[#161618] border border-white/5 rounded-xl px-4 py-3 text-white text-sm focus:border-primary/50 outline-none" />
                      </div>
                    </div>
                  </div>
 
-                 <div className="space-y-4">
+                 <div className="space-y-4 flex-1 flex flex-col">
                    <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Itens Selecionados</h3>
-                   <div className="space-y-2">
+                   <div className="space-y-2 flex-1 overflow-y-auto hide-scrollbar">
                      {csSelectedItems.length === 0 ? (
                        <div className="p-8 border-2 border-dashed border-white/5 rounded-2xl text-center">
                          <ShoppingBag size={24} className="text-gray-700 mx-auto mb-2" />
@@ -686,7 +710,7 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
                        </div>
                      ) : (
                        csSelectedItems.map((item, idx) => (
-                         <div key={idx} className="bg-[#09090B] border border-white/5 rounded-xl p-3 flex justify-between items-center">
+                         <div key={idx} className="bg-[#161618] border border-white/5 rounded-xl p-3 flex justify-between items-center">
                            <div className="flex items-center gap-3">
                              <div className="w-6 h-6 rounded-lg bg-primary text-white flex items-center justify-center font-black text-[10px]">{item.quantity}x</div>
                              <div className="flex flex-col">
@@ -694,7 +718,26 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
                                {item.doneness && <span className="text-[9px] font-black text-primary uppercase">Ponto: {item.doneness}</span>}
                              </div>
                            </div>
-                           <button onClick={() => setCsSelectedItems(prev => prev.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-500/10 p-1.5 rounded-lg transition-all"><Trash2 size={14} /></button>
+                           <div className="flex items-center gap-2">
+                             <button 
+                               onClick={() => {
+                                 const needsDoneness = item.category === 'tradicionais' || item.category === 'especiais';
+                                 if (needsDoneness) {
+                                   setSelectingDonenessFor(item as Product);
+                                 } else {
+                                   setCsSelectedItems(prev => {
+                                     const newItems = [...prev];
+                                     newItems[idx].quantity += 1;
+                                     return newItems;
+                                   });
+                                 }
+                               }} 
+                               className="bg-primary/20 text-primary hover:bg-primary hover:text-white p-1.5 rounded-lg transition-all"
+                             >
+                               <Plus size={14} />
+                             </button>
+                             <button onClick={() => setCsSelectedItems(prev => prev.filter((_, i) => i !== idx))} className="text-red-500 hover:bg-red-500/10 p-1.5 rounded-lg transition-all"><Trash2 size={14} /></button>
+                           </div>
                          </div>
                        ))
                      )}
@@ -702,36 +745,73 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
                  </div>
                </div>
 
-               <div className="space-y-4">
-                 <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Cardápio</h3>
-                 <div className="grid grid-cols-1 gap-2 max-h-[40vh] md:max-h-[400px] overflow-y-auto pr-2 hide-scrollbar">
-                   {tenant.products.map(product => (
-                     <button 
-                       key={product.id}
-                       onClick={() => {
-                          const needsDoneness = product.category === 'tradicionais' || product.category === 'especiais';
-                          
-                          if (needsDoneness) {
-                            setSelectingDonenessFor(product);
-                          } else {
-                            const existing = csSelectedItems.find(i => i.id === product.id && !i.doneness);
-                            if (existing) {
-                              setCsSelectedItems(prev => prev.map(i => i.id === product.id && !i.doneness ? { ...i, quantity: i.quantity + 1 } : i));
-                            } else {
-                              setCsSelectedItems(prev => [...prev, { ...product, quantity: 1, extras: [] } as CartItem]);
-                            }
-                          }
-                       }}
-                       className="bg-[#09090B] border border-white/5 hover:border-primary/30 rounded-xl p-3 flex items-center gap-3 transition-all group text-left"
+               {/* Coluna Direita: Cardápio (Categorias + Produtos) */}
+               <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+                 {/* Lista de Categorias */}
+                 <div className="w-full md:w-[200px] border-r border-white/5 bg-[#111113] overflow-y-auto hide-scrollbar p-4 space-y-2">
+                   <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4 px-2">Categorias</h3>
+                   {[
+                     { id: 'tradicionais', label: 'ESPETOS TRADICIONAIS' },
+                     { id: 'especiais', label: 'ESPETOS ESPECIAIS' },
+                     { id: 'combos', label: 'COMBOS BRUTUS' },
+                     { id: 'pao', label: 'CHURRASCO NO PÃO' },
+                     { id: 'bebidas', label: 'BEBIDAS' },
+                     { id: 'sobremesas', label: 'SOBREMESAS' }
+                   ].map(cat => (
+                     <button
+                       key={cat.id}
+                       onClick={() => setCsSelectedCategory(csSelectedCategory === cat.id ? null : cat.id)}
+                       className={`w-full text-left px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                         csSelectedCategory === cat.id 
+                           ? 'bg-primary text-black shadow-lg shadow-primary/20' 
+                           : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                       }`}
                      >
-                       <img src={product.image} className="w-10 h-10 rounded-lg object-cover grayscale group-hover:grayscale-0 transition-all" />
-                       <div className="flex-1 min-w-0">
-                         <p className="text-white text-[10px] font-black uppercase truncate">{product.name}</p>
-                         <p className="text-primary text-[10px] font-bold">R$ {product.price.toFixed(2)}</p>
-                       </div>
-                       <Plus size={14} className="text-gray-600 group-hover:text-primary" />
+                       {cat.label}
                      </button>
                    ))}
+                 </div>
+
+                 {/* Lista de Produtos */}
+                 <div className="flex-1 p-6 overflow-y-auto hide-scrollbar bg-[#09090B]">
+                   <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Produtos</h3>
+                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                     {tenant.products
+                       .filter(p => !csSelectedCategory || p.category === csSelectedCategory)
+                       .sort((a, b) => {
+                         const order = ['tradicionais', 'especiais', 'combos', 'pao', 'bebidas', 'sobremesas'];
+                         return order.indexOf(a.category) - order.indexOf(b.category);
+                       })
+                       .map(product => (
+                       <button 
+                         key={product.id}
+                         onClick={() => {
+                            const needsDoneness = product.category === 'tradicionais' || product.category === 'especiais';
+                            
+                            if (needsDoneness) {
+                              setSelectingDonenessFor(product);
+                            } else {
+                              const existing = csSelectedItems.find(i => i.id === product.id && !i.doneness);
+                              if (existing) {
+                                setCsSelectedItems(prev => prev.map(i => i.id === product.id && !i.doneness ? { ...i, quantity: i.quantity + 1 } : i));
+                              } else {
+                                setCsSelectedItems(prev => [...prev, { ...product, quantity: 1, extras: [] } as CartItem]);
+                              }
+                            }
+                         }}
+                         className="bg-[#161618] border border-white/5 hover:border-primary/30 rounded-xl p-3 flex items-center gap-3 transition-all group text-left"
+                       >
+                         <img src={product.image} className="w-12 h-12 rounded-lg object-cover grayscale group-hover:grayscale-0 transition-all" />
+                         <div className="flex-1 min-w-0">
+                           <p className="text-white text-[10px] font-black uppercase truncate">{product.name}</p>
+                           <p className="text-primary text-[10px] font-bold">R$ {product.price.toFixed(2)}</p>
+                         </div>
+                         <div className="w-8 h-8 rounded-full bg-white/5 group-hover:bg-primary flex items-center justify-center transition-colors">
+                           <Plus size={14} className="text-gray-400 group-hover:text-white" />
+                         </div>
+                       </button>
+                     ))}
+                   </div>
                  </div>
                </div>
              </div>
@@ -748,7 +828,14 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
                         <button
                           key={point}
                           onClick={() => {
-                            setCsSelectedItems(prev => [...prev, { ...selectingDonenessFor, quantity: 1, extras: [], doneness: point } as CartItem]);
+                            setCsSelectedItems(prev => {
+                              const existing = prev.find(i => i.id === selectingDonenessFor.id && i.doneness === point);
+                              if (existing) {
+                                return prev.map(i => i.id === selectingDonenessFor.id && i.doneness === point ? { ...i, quantity: i.quantity + 1 } : i);
+                              } else {
+                                return [...prev, { ...selectingDonenessFor, quantity: 1, extras: [], doneness: point } as CartItem];
+                              }
+                            });
                             setSelectingDonenessFor(null);
                           }}
                           className="w-full py-4 rounded-xl bg-[#09090B] border border-white/10 hover:border-primary hover:bg-primary hover:text-white text-gray-300 font-black uppercase tracking-widest transition-all active:scale-95"

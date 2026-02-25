@@ -268,16 +268,31 @@ const App: React.FC = () => {
 
       // 1. Baixa Automática no Estoque
       for (const item of cart) {
-        const { data: product } = await supabase.from('products').select('stock, availability').eq('id', item.id).single();
+        const { data: product } = await supabase.from('products').select('stock, availability, inventory_id').eq('id', item.id).single();
         if (product) {
           const currentStock = product.stock || 0;
           const newStock = Math.max(0, currentStock - item.quantity);
-          const newAvailability = newStock === 0 ? 'out_of_stock' : product.availability;
+          
+          // Lógica de Disponibilidade Corrigida
+          let newAvailability = product.availability;
+          
+          // Só muda para esgotado se tiver estoque vinculado e chegar a zero
+          if (product.inventory_id && newStock <= 0) {
+            newAvailability = 'out_of_stock';
+            console.log(`[Estoque] Produto "${item.name}" (ID: ${item.id}) marcado como ESGOTADO via Checkout.`);
+          } else if (!product.inventory_id) {
+            // Se não tem estoque vinculado, garante que continue disponível
+            newAvailability = 'available';
+          }
           
           await supabase.from('products').update({ 
             stock: newStock,
             availability: newAvailability
           }).eq('id', item.id);
+
+          if (newAvailability !== product.availability) {
+            console.log(`[Disponibilidade] Status de "${item.name}" alterado de ${product.availability} para ${newAvailability}`);
+          }
         }
       }
 
