@@ -14,6 +14,11 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Bypass service worker for audio files and Range requests
+  if (event.request.headers.has('range') || event.request.url.includes('/sounds/')) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((response) => {
       return response || fetch(event.request).then((fetchResponse) => {

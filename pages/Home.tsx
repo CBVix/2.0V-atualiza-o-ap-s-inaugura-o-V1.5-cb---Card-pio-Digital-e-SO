@@ -219,8 +219,12 @@ const Home: React.FC<HomeProps> = ({ onSelectProduct, tenant, isDarkMode, setIsD
         >
           <div className="flex items-start gap-4 mb-6">
              <div className="flex-shrink-0">
-                <div className={`w-16 h-16 rounded-2xl overflow-hidden shadow-lg border transition-all duration-500 ${isDarkMode ? 'border-white/10 bg-[#121212]' : 'border-silver bg-white'}`}>
-                   <img src={tenant.logo} alt={tenant.name} className="w-full h-full object-cover" />
+                <div className={`w-16 h-16 rounded-2xl overflow-hidden shadow-lg border flex items-center justify-center transition-all duration-500 ${isDarkMode ? 'border-white/10 bg-[#121212]' : 'border-silver bg-white'}`}>
+                   {tenant.logo ? (
+                     <img src={tenant.logo} alt={tenant.name} className="w-full h-full object-cover" />
+                   ) : (
+                     <Flame className="text-primary/40" size={32} />
+                   )}
                 </div>
              </div>
              <div className="flex-1 min-w-0">
@@ -317,7 +321,13 @@ const Home: React.FC<HomeProps> = ({ onSelectProduct, tenant, isDarkMode, setIsD
       <section className="px-6 space-y-4">
           {filteredProducts.map((product) => (
             <div key={product.id} onClick={() => onSelectProduct(product)} className={`p-3 rounded-2xl flex items-center gap-4 border shadow-sm active:scale-[0.98] transition-all group ${isDarkMode ? 'bg-[#1a1a1a] border-white/5' : 'bg-white border-silver'}`}>
-              <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100"><img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" /></div>
+              <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100 flex items-center justify-center">
+                {product.image ? (
+                  <img src={product.image} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                ) : (
+                  <Flame className="text-primary/40" size={32} />
+                )}
+              </div>
               <div className="flex-1 min-w-0">
                 <h4 className={`font-black text-xs uppercase tracking-tight truncate mb-1 ${isDarkMode ? 'text-white' : 'text-black'}`}>{product.name}</h4>
                 <p className={`text-[10px] mb-3 line-clamp-2 leading-relaxed opacity-60 ${isDarkMode ? 'text-gray-400' : 'text-[#334155]'}`}>{product.description}</p>

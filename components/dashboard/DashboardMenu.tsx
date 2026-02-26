@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Tenant, Product, InventoryItem, ProductSide } from '../../types';
-import { LayoutGrid, List, Plus, Copy, Edit2, Trash2, Star, Ban, Package, X, FileText, DollarSign, Settings, Image, Save, EyeOff, Ticket, AlertCircle, Utensils } from 'lucide-react';
+import { LayoutGrid, List, Plus, Copy, Edit2, Trash2, Star, Ban, Package, X, FileText, DollarSign, Settings, Image, Save, EyeOff, Ticket, AlertCircle, Utensils, Flame } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 
 interface DashboardMenuProps {
@@ -197,8 +197,12 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ tenant, inventory, onUpda
                      <button onClick={() => { setEditingProductId(product.id); setProductForm(product); setIsProductModalOpen(true); }} className="p-2 bg-blue-500 rounded-lg text-white hover:bg-blue-400" title="Editar"><Edit2 size={12} /></button>
                      <button onClick={() => handleDeleteProduct(product.id)} className="p-2 bg-red-500 rounded-lg text-white hover:bg-red-400" title="Excluir"><Trash2 size={12} /></button>
                    </div>
-                   <div className="relative mb-4">
-                      <img src={product.image} className="w-full h-32 object-cover rounded-xl" />
+                   <div className="relative mb-4 h-32 rounded-xl overflow-hidden bg-white/5 flex items-center justify-center">
+                      {product.image ? (
+                        <img src={product.image} loading="lazy" className="w-full h-full object-cover" />
+                      ) : (
+                        <Flame className="text-primary/40" size={32} />
+                      )}
                       {product.availability === 'out_of_stock' && (<div className="absolute inset-0 bg-black/60 rounded-xl flex items-center justify-center"><span className="text-[10px] font-black uppercase tracking-widest text-red-500 border border-red-500 px-2 py-1 rounded bg-black/50">Esgotado</span></div>)}
                       {product.isHighlighted && product.availability !== 'out_of_stock' && (<div className="absolute top-2 left-2 bg-yellow-500 text-white p-1 rounded-lg shadow-lg"><Star size={10} fill="currentColor" /></div>)}
                    </div>
@@ -223,7 +227,7 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ tenant, inventory, onUpda
                     <tbody className="divide-y divide-white/5">
                         {filteredProducts.map(product => (
                             <tr key={product.id} className="text-white hover:bg-white/5 transition-colors group">
-                                <td className="p-4"><div className="w-10 h-10 rounded-lg overflow-hidden bg-white/5"><img src={product.image} className="w-full h-full object-cover" /></div></td>
+                                <td className="p-4"><div className="w-10 h-10 rounded-lg overflow-hidden bg-white/5 flex items-center justify-center">{product.image ? <img src={product.image} loading="lazy" className="w-full h-full object-cover" /> : <Flame className="text-primary/40" size={16} />}</div></td>
                                 <td className="p-4"><p className="font-bold">{product.name}</p>{product.inventoryId && <span className="text-[9px] text-gray-500 flex items-center gap-1"><Package size={8}/> Estoque vinculado</span>}</td>
                                 <td className="p-4 text-gray-400 capitalize">{tenant.categories.find(c => c.id === product.category)?.name || product.category}</td>
                                 <td className="p-4 font-bold text-primary">R$ {product.price.toFixed(2)}</td>

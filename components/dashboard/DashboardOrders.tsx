@@ -21,7 +21,8 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
   const [returnStockOnDelete, setReturnStockOnDelete] = useState(true);
   
   const [isAudioEnabled, setIsAudioEnabled] = useState(() => {
-    return localStorage.getItem('soundEnabled') === 'true'; 
+    const stored = localStorage.getItem('soundEnabled');
+    return stored === null ? true : stored === 'true'; 
   });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [recentOrderIds, setRecentOrderIds] = useState<Set<string>>(new Set());
@@ -87,11 +88,34 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
   }, [orders]);
 
   useEffect(() => {
-    const audio = new Audio(`/sounds/notification.mp3?v=${Date.now()}`);
-    audio.crossOrigin = 'anonymous';
-    audio.preload = 'none';
-    audioRef.current = audio;
+    const loadAudio = async () => {
+      try {
+        // Fetch the audio file as a blob to bypass browser Range request issues
+        const response = await fetch('/sounds/notification.mp3');
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        
+        const audio = new Audio(url);
+        audio.volume = 1.0;
+        audioRef.current = audio;
+      } catch (err) {
+        console.error("Erro ao carregar áudio de notificação:", err);
+        // Fallback to direct URL if fetch fails
+        const audio = new Audio('/sounds/notification.mp3');
+        audio.volume = 1.0;
+        audioRef.current = audio;
+      }
+    };
+    
+    loadAudio();
     localStorage.setItem('soundEnabled', String(isAudioEnabled));
+    
+    return () => {
+      if (audioRef.current && audioRef.current.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+    };
   }, [isAudioEnabled]);
 
   useEffect(() => {
@@ -127,8 +151,19 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
         });
 
         if (isAudioEnabled && audioRef.current) {
-          audioRef.current.src = `/sounds/notification.mp3?v=${Date.now()}`;
-          audioRef.current.play().catch(e => console.warn("Erro ao tocar áudio:", e));
+          try {
+            audioRef.current.currentTime = 0;
+            const playPromise = audioRef.current.play();
+            if (playPromise !== undefined) {
+              playPromise
+                .then(() => console.log("Som de notificação reproduzido com sucesso."))
+                .catch(error => {
+                  console.warn("Erro ao reproduzir som de notificação:", error);
+                });
+            }
+          } catch (e) {
+            console.error("Erro fatal no áudio:", e);
+          }
         }
 
         setRecentOrderIds(prev => new Set(prev).add(mappedOrder.id));
@@ -338,12 +373,22 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
     { id: 'out_for_delivery', title: 'Em Trânsito', color: 'border-indigo-500', orders: getOrdersByStatus('out_for_delivery') }
   ];
 
+  const toggleAudio = () => {
+    const newState = !isAudioEnabled;
+    setIsAudioEnabled(newState);
+    
+    if (newState && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(e => console.warn("Erro ao testar áudio:", e));
+    }
+  };
+
   return (
     <div className="flex flex-col gap-0 bg-[#09090B] pb-[50px] min-h-screen">
        <div className="flex items-center justify-between bg-[#09090B] border-b border-white/5 p-3 px-6 shadow-xl sticky top-[-20px] z-[50]">
           <div className="flex items-center gap-4">
               <button 
-                onClick={() => setIsAudioEnabled(!isAudioEnabled)}
+                onClick={toggleAudio}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${isAudioEnabled ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-white/5 text-gray-500 border border-white/5'}`}
               >
                 {isAudioEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
@@ -801,7 +846,13 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
                          }}
                          className="bg-[#161618] border border-white/5 hover:border-primary/30 rounded-xl p-3 flex items-center gap-3 transition-all group text-left"
                        >
-                         <img src={product.image} className="w-12 h-12 rounded-lg object-cover grayscale group-hover:grayscale-0 transition-all" />
+                         {product.image ? (
+                           <img src={product.image} loading="lazy" className="w-12 h-12 rounded-lg object-cover grayscale group-hover:grayscale-0 transition-all" />
+                         ) : (
+                           <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center grayscale group-hover:grayscale-0 transition-all">
+                             <Flame className="text-primary/40" size={20} />
+                           </div>
+                         )}
                          <div className="flex-1 min-w-0">
                            <p className="text-white text-[10px] font-black uppercase truncate">{product.name}</p>
                            <p className="text-primary text-[10px] font-bold">R$ {product.price.toFixed(2)}</p>

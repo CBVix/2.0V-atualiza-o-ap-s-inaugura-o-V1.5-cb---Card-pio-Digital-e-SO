@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Store, Upload, MapPin, Wallet, Printer, Check, Copy, Loader2, AlertCircle, Download, Clock, Calendar, X, Plus, Save, ShieldCheck, Lock, Share2, Link as LinkIcon } from 'lucide-react';
+import { Store, Upload, MapPin, Wallet, Printer, Check, Copy, Loader2, AlertCircle, Download, Clock, Calendar, X, Plus, Save, ShieldCheck, Lock, Share2, Link as LinkIcon, Flame } from 'lucide-react';
 import { Tenant, PrinterSettings, BusinessHours } from '../../types';
 import { supabase } from '../../supabaseClient';
 
@@ -302,7 +302,11 @@ const DashboardSettings: React.FC<DashboardSettingsProps> = ({ tenant, onUpdateT
                  <div className="space-y-4">
                     <div className="flex items-center gap-4">
                        <div className="w-20 h-20 bg-black/50 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden relative group">
-                          <img src={settingsForm.logo} className={`w-full h-full object-cover transition-opacity ${isUploading ? 'opacity-30' : 'opacity-100'}`} />
+                          {settingsForm.logo ? (
+                            <img src={settingsForm.logo} className={`w-full h-full object-cover transition-opacity ${isUploading ? 'opacity-30' : 'opacity-100'}`} />
+                          ) : (
+                            <Flame className="text-primary/40" size={32} />
+                          )}
                           {isUploading ? <div className="absolute inset-0 flex items-center justify-center"><Loader2 size={24} className="text-primary animate-spin" /></div> : <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"><Upload size={20} className="text-white" /><input type="file" ref={logoInputRef} onChange={handleLogoUpload} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" /></div>}
                        </div>
                        <div className="flex-1 space-y-2">

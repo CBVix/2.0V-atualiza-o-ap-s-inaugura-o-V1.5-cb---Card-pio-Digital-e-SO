@@ -170,8 +170,12 @@ const Cart: React.FC<CartProps> = ({ items, onUpdateQuantity, onBack, tenant, us
                 return (
                   <div key={item.id + JSON.stringify(item.selectedSides) + item.itemObservation} className={`p-4 rounded-xl border transition-colors ${isDarkMode ? 'bg-[#1a1a1a] border-white/5 shadow-black/20' : 'bg-white border-silver shadow-sm'}`}>
                     <div className="flex items-start gap-4">
-                      <div className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 ${isDarkMode ? 'bg-[#121212]' : 'bg-[#F1F5F9]'}`}>
-                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      <div className={`w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center ${isDarkMode ? 'bg-[#121212]' : 'bg-[#F1F5F9]'}`}>
+                        {item.image ? (
+                          <img src={item.image} alt={item.name} loading="lazy" className="w-full h-full object-cover" />
+                        ) : (
+                          <Flame className="text-primary/40" size={24} />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className={`font-bold text-[11px] mb-0.5 truncate uppercase tracking-tight ${isDarkMode ? 'text-gray-200' : 'text-[#0F172A]'}`}>{item.name}</h4>
@@ -219,7 +223,13 @@ const Cart: React.FC<CartProps> = ({ items, onUpdateQuantity, onBack, tenant, us
                     <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar -mx-6 px-6">
                       {section.items.map((product) => (
                         <div key={product.id} onClick={() => onSelectProduct(product)} className={`min-w-[200px] p-2.5 rounded-2xl border flex gap-3 items-center ${isDarkMode ? 'bg-[#1a1a1a] border-white/5' : 'bg-white border-silver shadow-sm'}`}>
-                          <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-black/10"><img src={product.image} className="w-full h-full object-cover" /></div>
+                          <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-black/10 flex items-center justify-center">
+                            {product.image ? (
+                              <img src={product.image} loading="lazy" className="w-full h-full object-cover" />
+                            ) : (
+                              <Flame className="text-primary/40" size={20} />
+                            )}
+                          </div>
                           <div className="min-w-0 flex-1">
                             <h4 className={`text-[9px] font-black truncate uppercase tracking-tight mb-1 ${isDarkMode ? 'text-white' : 'text-[#0F172A]'}`}>{product.name}</h4>
                             <div className="flex items-center justify-between"><span className="text-primary font-black text-[10px]">R$ {product.price.toFixed(2)}</span><div className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center"><Plus size={12} /></div></div>

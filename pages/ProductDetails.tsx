@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ChevronLeft, Star, Clock, Minus, Plus, ShoppingCart, CheckCircle2, Heart, Utensils } from 'lucide-react';
+import { ChevronLeft, Star, Clock, Minus, Plus, ShoppingCart, CheckCircle2, Heart, Utensils, Flame } from 'lucide-react';
 import { Product, ProductSide } from '../types';
 
 interface ProductDetailsProps {
@@ -33,8 +33,12 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onBack, onAddT
   return (
     <div className={`min-h-screen pb-40 animate-in fade-in duration-500 transition-colors duration-500 ${isDarkMode ? 'bg-[#121212] text-white' : 'bg-[#F8FAFC]'}`}>
       <div className="relative h-[40vh] w-full px-4 pt-10">
-        <div className={`w-full h-full rounded-2xl overflow-hidden shadow-2xl relative border-4 transition-colors ${isDarkMode ? 'border-[#1a1a1a]' : 'border-white'}`}>
-          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+        <div className={`w-full h-full rounded-2xl overflow-hidden shadow-2xl relative border-4 flex items-center justify-center transition-colors ${isDarkMode ? 'border-[#1a1a1a] bg-[#121212]' : 'border-white bg-gray-100'}`}>
+          {product.image ? (
+            <img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover" />
+          ) : (
+            <Flame className="text-primary/40" size={64} />
+          )}
           <button 
             onClick={onBack}
             className={`absolute top-6 left-6 w-10 h-10 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all ${isDarkMode ? 'bg-black/60 text-white backdrop-blur-md' : 'bg-white/90 text-[#0F172A] backdrop-blur-md'}`}

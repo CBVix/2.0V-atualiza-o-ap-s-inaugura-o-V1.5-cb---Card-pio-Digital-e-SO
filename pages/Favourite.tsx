@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ChevronLeft, Clock, Heart } from 'lucide-react';
+import { ChevronLeft, Clock, Heart, Flame } from 'lucide-react';
 import { Product, Tenant } from '../types';
 
 interface FavouriteProps {
@@ -32,8 +32,12 @@ const Favourite: React.FC<FavouriteProps> = ({ tenant, onSelectProduct, onBack, 
                 key={product.id}
                 className={`p-3 rounded-xl flex items-center gap-4 border transition-all ${isDarkMode ? 'bg-[#1a1a1a] border-white/5' : 'bg-white border-gray-50 shadow-sm'}`}
               >
-                <div onClick={() => onSelectProduct(product)} className={`w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 transition-colors cursor-pointer ${isDarkMode ? 'bg-[#121212]' : 'bg-gray-50'}`}>
-                  <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                <div onClick={() => onSelectProduct(product)} className={`w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer ${isDarkMode ? 'bg-[#121212]' : 'bg-gray-50'}`}>
+                  {product.image ? (
+                    <img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover" />
+                  ) : (
+                    <Flame className="text-primary/40" size={32} />
+                  )}
                 </div>
                 <div className="flex-1">
                   <div className="flex justify-between items-start mb-1">
