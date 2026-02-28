@@ -1,4 +1,3 @@
-
 export interface ProductSide {
   name: string;
   price: number;
@@ -22,7 +21,7 @@ export interface Product {
   stock?: number;
   moods?: string[]; 
   affinityTags?: string[];
-  sides?: ProductSide[]; // Lista de acompanhamentos configuráveis
+  sides?: ProductSide[];
 }
 
 export type InventoryCategory = 'proteinas' | 'bebidas' | 'suprimentos' | 'outros';
@@ -111,8 +110,8 @@ export interface Tenant {
 
 export interface CartItem extends Product {
   quantity: number;
-  extras: string[]; // Mantido por compatibilidade
-  selectedSides?: ProductSide[]; // Novos acompanhamentos dinâmicos
+  extras: string[];
+  selectedSides?: ProductSide[];
   doneness?: string;
   itemObservation?: string;
   isAdditional?: boolean;
@@ -120,6 +119,9 @@ export interface CartItem extends Product {
 }
 
 export type OrderStatus = 'pending' | 'preparing' | 'finished' | 'canceled' | 'ready_to_send' | 'out_for_delivery';
+
+// ✅ CORREÇÃO: Adicionado campo paymentMethod para o DRE não usar valores hardcoded
+export type PaymentMethod = 'pix' | 'card' | 'cash' | 'other';
 
 export interface Order {
   id: string;
@@ -136,7 +138,8 @@ export interface Order {
   observation?: string;
   couponCode?: string;
   discountApplied?: number;
-  userId?: string;           
+  userId?: string;
+  paymentMethod?: PaymentMethod; // ✅ NOVO: método de pagamento real
 }
 
 export interface Coupon {

@@ -21,7 +21,7 @@ interface DashboardProps {
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   inventory: InventoryItem[];
   coupons: Coupon[];
-  updateOrderStatus: (id: string, status: OrderStatus) => void;
+  updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
   onUpdateInventory: (inventory: InventoryItem[]) => void;
   onSaveInventoryItem: (item: InventoryItem) => Promise<void>;
   onDeleteInventoryItem: (id: string) => Promise<void>;

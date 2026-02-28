@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Bike, Utensils, Search, Clock, AlertTriangle, Flame, CheckCircle2, Archive, ShoppingBag, XCircle, Printer, Loader2, Volume2, VolumeX, Sparkles, Send, Check, Trash2, X, Plus } from 'lucide-react';
 import { Order, OrderStatus, Tenant, OrderType, CartItem, Product } from '../../types';
@@ -7,7 +6,7 @@ import { supabase } from '../../supabaseClient';
 interface DashboardOrdersProps {
   orders: Order[];
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
-  updateOrderStatus: (id: string, status: OrderStatus) => void;
+  updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
   now: Date;
   tenant: Tenant;
 }
@@ -22,12 +21,125 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
   
   const [isAudioEnabled, setIsAudioEnabled] = useState(() => {
     const stored = localStorage.getItem('soundEnabled');
-    return stored === null ? true : stored === 'true'; 
+    return stored === null ? true : stored === 'true';
   });
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const playNotificationSound = () => {
+    if (!isAudioEnabled) return;
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const beep = (freq: number, start: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.4, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + duration);
+      };
+      beep(880, 0, 0.15);
+      beep(1100, 0.18, 0.15);
+      beep(880, 0.36, 0.2);
+    } catch (err) {
+      console.warn('Erro ao reproduzir som de notificação:', err);
+    }
+  };
+  // ─── Impressão automática via RawBT (HTTP API local porta 8080) ────────────
+  const autoPrintOrder = async (order: Order) => {
+    try {
+      // ESC/POS helpers
+      const ESC = '\x1B';
+      const GS  = '\x1D';
+      const LF  = '\n';
+
+      const center   = `${ESC}a\x01`;
+      const left     = `${ESC}a\x00`;
+      const bold     = `${ESC}E\x01`;
+      const boldOff  = `${ESC}E\x00`;
+      const large    = `${GS}!\x11`;   // duplo largura + altura
+      const normal   = `${GS}!\x00`;
+      const cut      = `${GS}V\x41\x03`;
+
+      const line  = (char = '-') => char.repeat(32) + LF;
+      const pad   = (left: string, right: string, total = 32) => {
+        const spaces = total - left.length - right.length;
+        return left + ' '.repeat(Math.max(spaces, 1)) + right;
+      };
+
+      const orderType = order.type === OrderType.DELIVERY
+        ? 'DELIVERY'
+        : order.tableNumber
+        ? `MESA ${order.tableNumber}`
+        : 'BALCÃO';
+
+      const time = new Date(order.createdAt).toLocaleTimeString('pt-BR', {
+        hour: '2-digit', minute: '2-digit'
+      });
+
+      let ticket = '';
+
+      // Cabeçalho
+      ticket += center + bold + large + (tenant.name || 'PEDIDO') + LF + normal + boldOff;
+      ticket += center + `#${order.orderNumber ?? ''} — ${orderType}` + LF;
+      ticket += center + time + LF;
+      ticket += left + line() ;
+
+      // Cliente
+      if (order.customerName) {
+        ticket += bold + `Cliente: ` + boldOff + order.customerName + LF;
+      }
+      if (order.type === OrderType.DELIVERY && order.address) {
+        ticket += bold + `Endereco: ` + boldOff + order.address + LF;
+      }
+      if (order.observation) {
+        ticket += bold + `Obs: ` + boldOff + order.observation + LF;
+      }
+      ticket += line();
+
+      // Itens
+      const items: CartItem[] = Array.isArray(order.items) ? order.items : [];
+      items.forEach((item) => {
+        ticket += bold + pad(`${item.quantity}x ${item.name}`, `R$${(item.price * item.quantity).toFixed(2)}`) + boldOff + LF;
+        if (item.selectedSides?.length) {
+          item.selectedSides.forEach(s => {
+            ticket += `   + ${s.name}` + LF;
+          });
+        }
+        if (item.itemObservation) {
+          ticket += `   * ${item.itemObservation}` + LF;
+        }
+      });
+
+      ticket += line();
+
+      // Total
+      if (order.discountApplied && order.discountApplied > 0) {
+        ticket += pad('Desconto:', `-R$${order.discountApplied.toFixed(2)}`) + LF;
+      }
+      ticket += bold + large + center + `TOTAL: R$${order.total.toFixed(2)}` + LF + normal + boldOff;
+      ticket += LF + LF + LF;
+      ticket += cut;
+
+      // Envia pro RawBT via HTTP API local
+      await fetch('http://localhost:8080/rawbt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain; charset=UTF-8' },
+        body: ticket,
+      });
+
+    } catch (err) {
+      console.warn('[AutoPrint] Falha ao imprimir via RawBT:', err);
+    }
+  };
+  // ────────────────────────────────────────────────────────────────────────────
+
   const [recentOrderIds, setRecentOrderIds] = useState<Set<string>>(new Set());
 
   const [printingOrder, setPrintingOrder] = useState<Order | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<string | null>(null);
 
   // Estados para Lançamento de Venda (Balcão)
   const [showCounterSaleModal, setShowCounterSaleModal] = useState(false);
@@ -88,44 +200,19 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
   }, [orders]);
 
   useEffect(() => {
-    const loadAudio = async () => {
-      try {
-        // Fetch the audio file as a blob to bypass browser Range request issues
-        const response = await fetch('/sounds/notification.mp3');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        
-        const audio = new Audio(url);
-        audio.volume = 1.0;
-        audioRef.current = audio;
-      } catch (err) {
-        console.error("Erro ao carregar áudio de notificação:", err);
-        // Fallback to direct URL if fetch fails
-        const audio = new Audio('/sounds/notification.mp3');
-        audio.volume = 1.0;
-        audioRef.current = audio;
-      }
-    };
-    
-    loadAudio();
     localStorage.setItem('soundEnabled', String(isAudioEnabled));
-    
-    return () => {
-      if (audioRef.current && audioRef.current.src.startsWith('blob:')) {
-        URL.revokeObjectURL(audioRef.current.src);
-      }
-    };
   }, [isAudioEnabled]);
 
   useEffect(() => {
-    const channel = supabase.channel(`kds_${tenant.slug}`)
+    console.log(`[KDS] Subscribing to orders for tenant: ${tenant.slug}`);
+    const channel = supabase.channel(`kds_realtime_${tenant.slug}_${Math.random().toString(36).substring(7)}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'orders',
         filter: `tenant_slug=eq.${tenant.slug}` 
       }, (payload) => {
+        console.log('[KDS] Realtime INSERT:', payload.new.id);
         const newOrderRaw = payload.new;
         
         const mappedOrder: Order = {
@@ -150,21 +237,8 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
           return [mappedOrder, ...prev];
         });
 
-        if (isAudioEnabled && audioRef.current) {
-          try {
-            audioRef.current.currentTime = 0;
-            const playPromise = audioRef.current.play();
-            if (playPromise !== undefined) {
-              playPromise
-                .then(() => console.log("Som de notificação reproduzido com sucesso."))
-                .catch(error => {
-                  console.warn("Erro ao reproduzir som de notificação:", error);
-                });
-            }
-          } catch (e) {
-            console.error("Erro fatal no áudio:", e);
-          }
-        }
+        playNotificationSound();
+        autoPrintOrder(mappedOrder);
 
         setRecentOrderIds(prev => new Set(prev).add(mappedOrder.id));
         setTimeout(() => {
@@ -181,6 +255,7 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
         table: 'orders',
         filter: `tenant_slug=eq.${tenant.slug}`
       }, (payload) => {
+        console.log('[KDS] Realtime UPDATE:', payload.new.id, payload.new.status);
         const updated = payload.new;
         setOrders(prev => prev.map(o => o.id === updated.id ? { 
           ...o, 
@@ -193,26 +268,56 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
         table: 'orders',
         filter: `tenant_slug=eq.${tenant.slug}`
       }, (payload) => {
+        console.log('[KDS] Realtime DELETE:', payload.old.id);
         const deletedId = payload.old.id;
         setOrders(prev => prev.filter(o => o.id !== deletedId));
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`[KDS] Subscription status for ${tenant.slug}:`, status);
+      });
 
     return () => {
+      console.log(`[KDS] Unsubscribing from orders for tenant: ${tenant.slug}`);
       supabase.removeChannel(channel);
     };
   }, [tenant.slug, isAudioEnabled, setOrders]);
+
+  const handleStatusChangeInternal = async (orderId: string, newStatus: OrderStatus) => {
+    setIsUpdatingStatus(orderId);
+    try {
+      // Optimistic update
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      
+      // Database update
+      await updateOrderStatus(orderId, newStatus);
+      
+      console.log(`[KDS] Status updated to ${newStatus} for order ${orderId}`);
+    } catch (err) {
+      console.error("[KDS] Error updating status:", err);
+      // Rollback on error (optional, but good practice)
+      // fetchInitialData() could be called here to resync
+    } finally {
+      setIsUpdatingStatus(null);
+    }
+  };
 
   const handlePrintOrder = (order: Order) => {
     setPrintingOrder(order);
   };
 
   const handleOutForDelivery = async (order: Order) => {
-    updateOrderStatus(order.id, 'out_for_delivery');
-    const message = `Olá, ${order.customerName}! Seu pedido do ${tenant.name} acabou de sair para entrega e logo chegará até você. Prepare o apetite! 🛵🔥`;
-    const cleanPhone = order.customerWhatsapp.replace(/\D/g, '');
-    const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+    setIsUpdatingStatus(order.id);
+    try {
+      await handleStatusChangeInternal(order.id, 'out_for_delivery');
+      const message = `Olá, ${order.customerName}! Seu pedido do ${tenant.name} acabou de sair para entrega e logo chegará até você. Prepare o apetite! 🛵🔥`;
+      const cleanPhone = order.customerWhatsapp.replace(/\D/g, '');
+      const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+    } catch (error) {
+      console.error("Erro ao despachar pedido:", error);
+    } finally {
+      setIsUpdatingStatus(null);
+    }
   };
 
   const handleDeleteOrder = async (order: Order) => {
@@ -376,10 +481,8 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
   const toggleAudio = () => {
     const newState = !isAudioEnabled;
     setIsAudioEnabled(newState);
-    
-    if (newState && audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(e => console.warn("Erro ao testar áudio:", e));
+    if (newState) {
+      setTimeout(playNotificationSound, 50);
     }
   };
 
@@ -528,22 +631,52 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
                               </div>
                               <div className="flex flex-col gap-1.5">
                                  {col.id === 'pending' && (
-                                   <button onClick={(e) => { e.stopPropagation(); updateOrderStatus(order.id, 'preparing'); }} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em] transition-all shadow-lg active:scale-95">Começar</button>
+                                   <button 
+                                     disabled={isUpdatingStatus === order.id}
+                                     onClick={(e) => { e.stopPropagation(); handleStatusChangeInternal(order.id, 'preparing'); }} 
+                                     className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                                   >
+                                     {isUpdatingStatus === order.id ? <Loader2 size={12} className="animate-spin" /> : 'Começar'}
+                                   </button>
                                  )}
                                  {col.id === 'preparing' && (
-                                   <button onClick={(e) => { e.stopPropagation(); updateOrderStatus(order.id, 'ready_to_send'); }} className="w-full bg-green-600 hover:bg-green-500 text-white py-2.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em] transition-all shadow-lg active:scale-95">Pronto</button>
+                                   <button 
+                                     disabled={isUpdatingStatus === order.id}
+                                     onClick={(e) => { e.stopPropagation(); handleStatusChangeInternal(order.id, 'ready_to_send'); }} 
+                                     className="w-full bg-green-600 hover:bg-green-500 text-white py-2.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                                   >
+                                     {isUpdatingStatus === order.id ? <Loader2 size={12} className="animate-spin" /> : 'Pronto'}
+                                   </button>
                                  )}
                                  {col.id === 'ready_to_send' && (
                                    <div className="flex gap-1.5">
                                       {order.type === 'delivery' ? (
-                                        <button onClick={(e) => { e.stopPropagation(); handleOutForDelivery(order); }} className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-[8px] font-black uppercase tracking-[0.15em] transition-all shadow-lg active:scale-95">Sair</button>
+                                        <button 
+                                           disabled={isUpdatingStatus === order.id}
+                                           onClick={(e) => { e.stopPropagation(); handleOutForDelivery(order); }} 
+                                           className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-[8px] font-black uppercase tracking-[0.15em] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                                         >
+                                           {isUpdatingStatus === order.id ? <Loader2 size={12} className="animate-spin" /> : 'Sair'}
+                                         </button>
                                       ) : (
-                                        <button onClick={(e) => { e.stopPropagation(); updateOrderStatus(order.id, 'finished'); }} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em] transition-all shadow-lg active:scale-95">Entregue</button>
+                                        <button 
+                                           disabled={isUpdatingStatus === order.id}
+                                           onClick={(e) => { e.stopPropagation(); handleStatusChangeInternal(order.id, 'finished'); }} 
+                                           className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                                         >
+                                           {isUpdatingStatus === order.id ? <Loader2 size={12} className="animate-spin" /> : 'Entregue'}
+                                         </button>
                                       )}
                                    </div>
                                  )}
                                  {col.id === 'out_for_delivery' && (
-                                   <button onClick={(e) => { e.stopPropagation(); updateOrderStatus(order.id, 'finished'); }} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em] transition-all shadow-lg active:scale-95">Concluído</button>
+                                   <button 
+                                     disabled={isUpdatingStatus === order.id}
+                                     onClick={(e) => { e.stopPropagation(); handleStatusChangeInternal(order.id, 'finished'); }} 
+                                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-[8px] font-black uppercase tracking-[0.2em] transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2"
+                                   >
+                                     {isUpdatingStatus === order.id ? <Loader2 size={12} className="animate-spin" /> : 'Concluído'}
+                                   </button>
                                  )}
                               </div>
                            </div>

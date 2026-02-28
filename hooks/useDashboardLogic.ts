@@ -1,13 +1,11 @@
-
 import { useMemo } from 'react';
-import { Order, InventoryItem, Tenant, CustomerMetrics, DREHistoryItem } from '../types';
+import { Order, InventoryItem, Tenant, CustomerMetrics, DREHistoryItem, PaymentMethod } from '../types';
 
 interface EnhancedCustomerMetric extends CustomerMetrics {
   favoriteDish: string;
   abcClass: 'A' | 'B' | 'C';
   preferredTime: string;
   averageTicket: number;
-  // Fix: added missing property to interface to match object literal assignment
   tenantSlug?: string;
 }
 
@@ -24,11 +22,10 @@ export const useDashboardLogic = (
   dreHistory: DREHistoryItem[] = []
 ) => {
 
-  // 0. Filter Orders by Date
+  // 0. Filtra pedidos pelo período selecionado
   const filteredOrders = useMemo(() => {
     if (!startDate || !endDate) return orders;
     
-    // Parse dates manually to ensure local time
     const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
     const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
     
@@ -41,15 +38,13 @@ export const useDashboardLogic = (
     });
   }, [orders, startDate, endDate]);
 
-  // 1. CRM Metrics - Resiliente a dados nulos
+  // 1. CRM — métricas por cliente
   const customers = useMemo(() => {
     const custMap: Record<string, EnhancedCustomerMetric & { itemCounts: Record<string, number> }> = {};
     const nowTime = new Date().getTime();
-    let globalTotalRevenue = 0;
 
     (filteredOrders || []).forEach(order => {
       if (!order) return;
-      globalTotalRevenue += (order.total || 0);
       const rawPhone = order.customerWhatsapp ? order.customerWhatsapp.replace(/\D/g, '') : '';
       const customerKey = rawPhone || `NAME_${(order.customerName || 'SEM_NOME').trim().toUpperCase()}`;
 
@@ -114,7 +109,7 @@ export const useDashboardLogic = (
     return { newThisMonth, retentionRate, whales };
   }, [customers]);
 
-  // 2. Chart Data
+  // 2. Dados para gráficos
   const chartData = useMemo(() => {
     const finishedOrders = (filteredOrders || []).filter(o => o.status === 'finished');
     const salesByHour = new Array(24).fill(0);
@@ -143,15 +138,15 @@ export const useDashboardLogic = (
     };
   }, [filteredOrders]);
 
-  // 3. Finance Calculations
+  // 3. Cálculos financeiros (DRE)
   const dreCalculations = useMemo(() => {
     const finishedOrders = (filteredOrders || []).filter(o => o.status === 'finished');
     const revenue = finishedOrders.reduce((acc, o) => acc + (o.total || 0), 0);
     
     let cmv = 0;
     finishedOrders.forEach(o => o.items.forEach(i => {
-       const inv = (inventory || []).find(x => x.id === i.inventoryId);
-       cmv += inv ? inv.costPrice * i.quantity : (i.price * 0.35 * i.quantity);
+      const inv = (inventory || []).find(x => x.id === i.inventoryId);
+      cmv += inv ? inv.costPrice * i.quantity : (i.price * 0.35 * i.quantity);
     }));
 
     const taxes = revenue * ((tenant?.cardMachineFee || 0) / 100);
@@ -160,7 +155,29 @@ export const useDashboardLogic = (
     
     const totalExpenses = cmv + taxes + fixedCosts + manualOut;
     const netProfit = revenue - totalExpenses;
-    const breakEven = fixedCosts / 0.45; // Estimativa de 45% de margem contribuição
+    const breakEven = fixedCosts > 0 ? fixedCosts / 0.45 : 0;
+
+    // ✅ CORREÇÃO: pagamentos calculados a partir dos dados reais dos pedidos
+    // em vez de split hardcoded 50/40/10
+    const paymentTotals = finishedOrders.reduce(
+      (acc, o) => {
+        const method = (o.paymentMethod as PaymentMethod) || 'other';
+        // mapeia 'card' para o bucket card, resto para seu tipo
+        if (method === 'pix') acc.pix += o.total;
+        else if (method === 'card') acc.card += o.total;
+        else if (method === 'cash') acc.cash += o.total;
+        else acc.other += o.total;
+        return acc;
+      },
+      { pix: 0, card: 0, cash: 0, other: 0 }
+    );
+
+    // Se nenhum pedido tem paymentMethod salvo ainda (dados antigos),
+    // mostra zero em vez de inventar percentuais
+    const hasPaymentData = finishedOrders.some(o => o.paymentMethod);
+    const payments = hasPaymentData
+      ? { pix: paymentTotals.pix, card: paymentTotals.card, cash: paymentTotals.cash }
+      : { pix: 0, card: 0, cash: 0 }; // sem dados reais, não estima
 
     return {
       revenue,
@@ -171,7 +188,8 @@ export const useDashboardLogic = (
       totalExpenses,
       netProfit,
       breakEven,
-      payments: { pix: revenue * 0.5, card: revenue * 0.4, cash: revenue * 0.1 },
+      payments,
+      hasPaymentData, // ✅ flag para o componente exibir aviso se necessário
       deltas: { revenue: 0, expenses: 0, profit: 0 }
     };
   }, [filteredOrders, inventory, tenant, fixedCostsDetails, manualTransactions]);

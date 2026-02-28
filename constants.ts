@@ -1,5 +1,8 @@
-
 import { Tenant, InventoryItem, Category } from './types';
+
+// ✅ CORREÇÃO: Slug extraído como constante — use em todo o projeto
+// em vez de escrever 'churras-brutus' manualmente em qualquer lugar
+export const DEFAULT_TENANT_SLUG = 'churras-brutus';
 
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'tradicionais', name: 'Espetos Tradicionais', icon: 'Flame' },
@@ -18,9 +21,9 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
 ];
 
 export const TENANTS_DB: Record<string, Tenant> = {
-  'churras-brutus': {
+  [DEFAULT_TENANT_SLUG]: {
     name: 'Churras Brutus',
-    slug: 'churras-brutus',
+    slug: DEFAULT_TENANT_SLUG,
     logo: 'https://images.unsplash.com/photo-1583394838336-acd977730f90?q=80&w=100&auto=format&fit=crop',
     whatsapp: '5511999999999',
     pixKey: 'pix@churrasbrutus.com.br',
