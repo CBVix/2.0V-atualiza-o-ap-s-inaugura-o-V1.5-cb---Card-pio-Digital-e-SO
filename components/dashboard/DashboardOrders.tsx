@@ -130,6 +130,20 @@ const DashboardOrders: React.FC<DashboardOrdersProps> = ({ orders = [], setOrder
         body: ticket,
       });
 
+      // Salva arquivo localmente (simulação via download)
+      const blob = new Blob([ticket], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pedido_${(order.orderNumber || order.id).toString().replace(/[^a-z0-9]/gi, '_')}.txt`;
+      // Tenta salvar no diretório específico (apenas Android/Chrome com suporte a File System Access API ou comportamento padrão de download)
+      // Nota: Browsers não permitem salvar em caminhos arbitrários como /storage/emulated/0/download por segurança.
+      // O arquivo irá para a pasta padrão de Downloads do navegador.
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
     } catch (err) {
       console.warn('[AutoPrint] Falha ao imprimir via RawBT:', err);
     }
