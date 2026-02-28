@@ -8,8 +8,14 @@
   ],
   "redirects": [
     {
-      "source": "/",
-      "destination": "https://churrasbrutus.com/?loja=churras-brutus",
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "churras-brutus.vercel.app"
+        }
+      ],
+      "destination": "https://churrasbrutus.com/$1",
       "permanent": true
     }
   ]
