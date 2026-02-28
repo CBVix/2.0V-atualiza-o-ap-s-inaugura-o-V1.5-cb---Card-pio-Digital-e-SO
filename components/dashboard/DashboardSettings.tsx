@@ -58,7 +58,7 @@ const DashboardSettings: React.FC<DashboardSettingsProps> = ({ tenant, onUpdateT
   useEffect(() => {
     if (qrcodeContainerRef.current) {
       qrcodeContainerRef.current.innerHTML = '';
-      const storeUrl = `${window.location.origin}${window.location.pathname}?loja=${tenant.slug}`;
+      const storeUrl = `https://churrasbrutus.com/?loja=${tenant.slug}`;
       // @ts-ignore
       if (window.QRCode) {
         // @ts-ignore
@@ -194,7 +194,7 @@ const DashboardSettings: React.FC<DashboardSettingsProps> = ({ tenant, onUpdateT
   };
 
   const handleCopyMenuLink = () => {
-    const menuUrl = `${window.location.origin}${window.location.pathname}?loja=${tenant.slug}`;
+    const menuUrl = `https://churrasbrutus.com/?loja=${tenant.slug}`;
     navigator.clipboard.writeText(menuUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
@@ -250,7 +250,7 @@ const DashboardSettings: React.FC<DashboardSettingsProps> = ({ tenant, onUpdateT
             <h1>${tenant.name}</h1>
             <p>Acesse nosso cardápio</p>
             <img src="${finalImage}" />
-            <div class="url">${window.location.origin}${window.location.pathname}?loja=${tenant.slug}</div>
+            <div class="url">https://churrasbrutus.com/?loja=${tenant.slug}</div>
           </div>
           <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 1000); }</script>
         </body>
@@ -421,7 +421,7 @@ const DashboardSettings: React.FC<DashboardSettingsProps> = ({ tenant, onUpdateT
                         
                         <div className="flex gap-2">
                            <button 
-                             onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Acesse nosso cardápio: ${window.location.origin}${window.location.pathname}?loja=${tenant.slug}`)}`, '_blank')}
+                             onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`Acesse nosso cardápio: https://churrasbrutus.com/?loja=${tenant.slug}`)}`, '_blank')}
                              className="flex-1 h-12 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
                            >
                              <Share2 size={14} /> WhatsApp
