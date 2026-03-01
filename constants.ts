@@ -18,6 +18,7 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
   { id: 'inv-2', name: 'Pão de Alho', currentQty: 50, minQty: 15, unit: 'un', category: 'outros', costPrice: 2.10 },
   { id: 'inv-3', name: 'Cerveja Lata', currentQty: 24, minQty: 12, unit: 'un', category: 'bebidas', costPrice: 3.20 },
   { id: 'inv-4', name: 'Carvão Vegetal', currentQty: 3, minQty: 5, unit: 'saco', category: 'suprimentos', costPrice: 18.00 },
+  { id: 'inv-5', name: 'H2O', currentQty: 24, minQty: 10, unit: 'un', category: 'bebidas', costPrice: 4.50 },
 ];
 
 export const TENANTS_DB: Record<string, Tenant> = {
@@ -77,6 +78,20 @@ export const TENANTS_DB: Record<string, Tenant> = {
         availability: 'available',
         inventoryId: 'inv-2',
         moods: ['rapido'],
+      },
+      {
+        id: 'h2o-1',
+        name: 'H2O',
+        price: 10.00,
+        rating: 5.0,
+        reviews: '0',
+        image: 'https://images.unsplash.com/photo-1548964856-ac520a4a9910?q=80&w=400&auto=format&fit=crop',
+        category: 'bebidas',
+        prepTime: '2 Min',
+        description: 'Água mineral levemente gaseificada com sabor limão.',
+        availability: 'available',
+        inventoryId: 'inv-5',
+        moods: ['refrescante'],
       }
     ]
   }
